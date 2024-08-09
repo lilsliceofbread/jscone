@@ -9,7 +9,6 @@ int main(void)
     char* json;
     FILE* file;
     u32 file_size;
-    JsconeNode* output;
 
     file = fopen("example.json", "rb");
 
@@ -24,11 +23,30 @@ int main(void)
 
     fclose(file);
 
-    output = jscone_parse(json, strlen(json));
+    /* parser WIP: testing lexing */
 
-    printf("%s\n", json);
+    JsconeLexer lexer = {
+        .json = json,
+        .length = file_size,
+        .curr = {.first = 0, .end = 0},
+    };
+
+    char buffer[128];
+    printf("[");
+    while(jscone_lexer_next_token(&lexer))
+    {
+        if(lexer.curr.first == lexer.curr.end)
+            break;
+
+        memset(buffer, 0, 128);
+        memcpy(buffer, lexer.json + lexer.curr.first, lexer.curr.end - lexer.curr.first);
+
+        printf("\"%s\", ", buffer);
+        //printf("%s", buffer);
+    }
+    printf("]\n");
 
     free(json);
-    jscone_free(output);
+
     return 0;
 }

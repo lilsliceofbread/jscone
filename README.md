@@ -1,8 +1,14 @@
 # jscone
 
+WORK IN PROGRESS
+
 my attempt a json parser in c
 
-WORK IN PROGRESS
+- single header
+
+- only parsing, no writing
+
+- creates n-ary tree of values (names of name: value pairs are just nodes pointing to a child)
 
 run examples with:
 
@@ -11,7 +17,3 @@ cd example
 chmod +x ./run.sh
 ./run.sh
 ```
-
-- single header
-
-- only parsing, no writing
