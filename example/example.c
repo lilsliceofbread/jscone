@@ -32,8 +32,7 @@ int main(void)
     };
 
     char buffer[128];
-    printf("[");
-    while(jscone_lexer_next_token(&lexer))
+    while(jscone_lexer_next_token(&lexer) != JSCONE_FAILURE)
     {
         if(lexer.curr.first == lexer.curr.end)
             break;
@@ -41,10 +40,9 @@ int main(void)
         memset(buffer, 0, 128);
         memcpy(buffer, lexer.json + lexer.curr.first, lexer.curr.end - lexer.curr.first);
 
-        printf("\"%s\", ", buffer);
-        //printf("%s", buffer);
+        //printf("\"%s\", \n", buffer);
+        printf("%s\n", buffer);
     }
-    printf("]\n");
 
     free(json);
 

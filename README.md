@@ -10,7 +10,7 @@ my attempt a json parser in c
 
 - creates n-ary tree of values (names of name: value pairs are just nodes pointing to a child)
 
-run examples with:
+run example with:
 
 ```
 cd example
