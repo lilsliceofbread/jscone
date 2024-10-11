@@ -40,7 +40,6 @@ int main(void)
         memset(buffer, 0, 128);
         memcpy(buffer, lexer.json + lexer.curr.first, lexer.curr.end - lexer.curr.first);
 
-        //printf("\"%s\", \n", buffer);
         printf("%s\n", buffer);
     }
 

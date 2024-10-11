@@ -30,10 +30,11 @@ enum
 typedef enum
 {
     JSCONE_NONE,
-    JSCONE_NAME, // name part of name: value pair
     JSCONE_STRING,
     JSCONE_NUM, 
     JSCONE_BOOL, 
+    JSCONE_OBJECT, // won't contain any value
+    JSCONE_ARRAY,
     JSCONE_NULL,
 } JsconeType;
 
@@ -41,7 +42,7 @@ typedef union
 {
     char* str; // malloced
     f64 num;
-    u8 boolean;
+    u8 bool;
 } JsconeVal;
 
 typedef struct JsconeNode
@@ -53,6 +54,7 @@ typedef struct JsconeNode
     struct JsconeNode* next;
     struct JsconeNode* prev;
 
+    char* name; // malloced
     JsconeType type;
     JsconeVal value;
 } JsconeNode;
@@ -60,20 +62,30 @@ typedef struct JsconeNode
 JsconeNode* jscone_parse(const char* json, u32 length);
 
 /**
+ * @brief    finds node at specified path e.g "world/player_data"
+ * @returns  pointer to node at path, or if it is an array, one of the children.
+ */
+JsconeNode* jscone_find(JsconeNode* root, const char* path);
+
+/**
  * @brief  frees output from jscone_parse. call when you are done with it.
  * @note   pass any node from the output, the function will free them all
  */
 void jscone_free(JsconeNode* parsed_json);
 
+
+
 /**
  * internal types and functions
  */
 
-#define JSCONE_PARSER_NEXT_TOKEN(parser) jscone_lexer_next_token(&((parser)->lexer))
+/* shouldn't cause leaked memory as the output can still be freed */
+#define JSCONE_PARSER_NEXT_TOKEN(parser) if(jscone_lexer_next_token(&((parser)->lexer)) == JSCONE_FAILURE) return JSCONE_FAILURE; 
+#define JSCONE_PARSER_TOKEN_LENGTH(parser) ((parser)->lexer.curr.end - (parser)->lexer.curr.first)
 #define JSCONE_PARSER_GET_FIRST_CHAR(parser) ((parser)->lexer.json[(parser)->lexer.curr.first])
 #define JSCONE_PARSER_GET_LAST_CHAR(parser) ((parser)->lexer.json[(parser)->lexer.curr.end - 1])
+
 #define JSCONE_ERROR(msg, ...) fprintf(stderr,"JSCONE: " msg,##__VA_ARGS__)
-//! change later so program can continue
 #define JSCONE_EXPECT_CHAR(char, expected) \
 if(char != expected)                                  \
 {                                                     \
@@ -84,7 +96,7 @@ if(char != expected)                                  \
 typedef struct
 {
     u32 first; // first character in json string (index)
-    u32 end;  // 1 past last character
+    u32 end;   // 1 past last character
 } JsconeToken;
 
 typedef struct
@@ -97,15 +109,16 @@ typedef struct
 typedef struct
 {
     JsconeLexer lexer;
-    u32 tree_level; // how far into tree: 0 is root json object
-    JsconeNode* curr_node;
+    JsconeNode* curr_node; // current parent i.e. only the current object/array
 } JsconeParser;
 
-i32 jscone_parser_parse_object(JsconeParser* parser);
-i32 jscone_parser_parse_array(JsconeParser* parser);
-i32 jscone_parser_parse_string(JsconeParser* parser);
-i32 jscone_parser_parse_number(JsconeParser* parser);
-i32 jscone_parser_parse_enum(JsconeParser* parser);
+i32 jscone_parser_parse_value(JsconeParser* parser, const char* name);
+
+i32 jscone_parser_parse_object(JsconeParser* parser, const char* name);
+i32 jscone_parser_parse_array(JsconeParser* parser, const char* name);
+i32 jscone_parser_parse_string(JsconeParser* parser, const char* name);
+i32 jscone_parser_parse_number(JsconeParser* parser, const char* name);
+i32 jscone_parser_parse_enum(JsconeParser* parser, const char* name);
 
 /**
  * @note if first == end then EOF
@@ -113,8 +126,12 @@ i32 jscone_parser_parse_enum(JsconeParser* parser);
 i32 jscone_lexer_next_token(JsconeLexer* lexer);
 i32 jscone_lexer_lex_string(JsconeLexer* lexer);
 
-JsconeNode* jscone_node_create(void);
+JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal value);
 void jscone_node_free(JsconeNode* node);
+
+char* copy_substring(char* first_char, u32 length);
+
+
 
 /**
  * user functions
@@ -122,22 +139,20 @@ void jscone_node_free(JsconeNode* node);
 
 JsconeNode* jscone_parse(const char* json, u32 length)
 {
-    JsconeNode* root = jscone_node_create(); // top object
-
+    /* top object */
     JsconeParser parser = {
         .lexer = {
             .json = json,
             .length = length,
             .curr = {.first = 0, .end = 0}
         },
-        .tree_level = 0,
-        .curr_node = root
+        .curr_node = NULL,
     };
 
-    ////JSCONE_PARSER_NEXT_TOKEN(&parser);
-    ////jscone_parser_parse_object(&parser);
+    JSCONE_PARSER_NEXT_TOKEN(&parser);
+    jscone_parser_parse_object(&parser, NULL); // will return the root node
 
-    return root;
+    return parser.curr_node;
 }
 
 void jscone_free(JsconeNode* parsed_json)
@@ -145,33 +160,186 @@ void jscone_free(JsconeNode* parsed_json)
     /* find top node */
     JsconeNode* head = parsed_json;
     while(head->parent != NULL)
+    {
         head = head->parent;
+    }
 
     jscone_node_free(head);
 }
+
+
 
 /**
  * internal functions
  */
 
-i32 jscone_parser_parse_object(JsconeParser* parser)
+/* parsing */
+
+i32 jscone_parser_parse_value(JsconeParser* parser, const char* name)
 {
-    JsconeNode* last_node = parser->curr_node;
+    /**
+     * potential errors with this if user forgets initial { or [ in object/array
+     * but (hopefully) should be caught by EXPECT_CHAR in object/array parse funcs
+     * edit: technically a lot of issues are required to be caught by EXPECT_CHAR
+     * such as if the file ends early
+     */
+    /* determine type */
+    switch(JSCONE_PARSER_GET_FIRST_CHAR(parser))
+    {
+        case '{':
+            return jscone_parser_parse_object(parser, name);
+        case '[':
+            return jscone_parser_parse_array(parser, name);
+        case '\"':
+            return jscone_parser_parse_string(parser, name);
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        case '-': case '.':
+            return jscone_parser_parse_number(parser, name);
+        default:
+            return jscone_parser_parse_enum(parser, name);
+    }
+
+    return JSCONE_FAILURE; // how did we get here?
+}
+
+i32 jscone_parser_parse_object(JsconeParser* parser, const char* name)
+{
+    JsconeNode* node_before = parser->curr_node;
+    parser->curr_node = jscone_node_create(node_before, JSCONE_OBJECT, (JsconeVal)0);
+    parser->curr_node->name = name;
+    char* curr_name = NULL;
+
     /* caller should have already gone to next token */
     JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), '{');
+    JSCONE_PARSER_NEXT_TOKEN(parser);
     while(JSCONE_PARSER_GET_FIRST_CHAR(parser) != '}')
     {
-        JSCONE_PARSER_NEXT_TOKEN(parser);
-        JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), '"');
-        JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_LAST_CHAR(parser), '"');
-        /* parse string */
+        JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), '\"');
+        JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_LAST_CHAR(parser), '\"');
 
-        /* parse value */
+        curr_name = copy_substring(JSCONE_PARSER_TOKEN_LENGTH(parser), &JSCONE_PARSER_GET_FIRST_CHAR(parser));
+
+        JSCONE_PARSER_NEXT_TOKEN(parser);
+        JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), ':');
+
+        JSCONE_PARSER_NEXT_TOKEN(parser);
+        jscone_parser_parse_value(parser, curr_name);
+
+        JSCONE_PARSER_NEXT_TOKEN(parser);
+        if(JSCONE_PARSER_GET_FIRST_CHAR(parser) == ',')
+        {
+            JSCONE_PARSER_NEXT_TOKEN(parser);
+        }
+        else
+        {
+            JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), '}');
+        }
     }
     
-    /* return to root node of object? */
+    /* special case for root node */
+    if(node_before != NULL)
+    {
+        /* reset curr_node to go back up the tree so next calls work */
+        parser->curr_node = node_before;
+    }
     return JSCONE_SUCCESS;
 }
+
+i32 jscone_parser_parse_array(JsconeParser* parser, const char* name)
+{
+    JsconeNode* node_before = parser->curr_node;
+    parser->curr_node = jscone_node_create(node_before, JSCONE_ARRAY, (JsconeVal)0);
+    parser->curr_node->name = name;
+
+    /* caller should have already gone to next token */
+    JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), '[');
+    JSCONE_PARSER_NEXT_TOKEN(parser);
+    while(JSCONE_PARSER_GET_FIRST_CHAR(parser) != ']')
+    {
+        jscone_parser_parse_value(parser, name); // keep all names same in array
+
+        JSCONE_PARSER_NEXT_TOKEN(parser);
+        if(JSCONE_PARSER_GET_FIRST_CHAR(parser) == ',')
+        {
+            JSCONE_PARSER_NEXT_TOKEN(parser);
+        }
+        else
+        {
+            JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), ']');
+        }
+    }
+
+    /* reset curr_node to go back up the tree so next calls work */
+    parser->curr_node = node_before;
+    return JSCONE_SUCCESS;
+}
+
+i32 jscone_parser_parse_string(JsconeParser* parser, const char* name)
+{
+    /**
+     * json strings allow escaping forward slashes "\/" and c doesn't
+     * and I can't be bothered to handle that, lets hope it never comes up
+     */
+    char* string = copy_substring(JSCONE_PARSER_TOKEN_LENGTH(parser), &JSCONE_PARSER_GET_FIRST_CHAR(parser));
+
+    JsconeNode* node = jscone_node_create(parser->curr_node, JSCONE_STRING, (JsconeVal){.str = string});
+    node->name = name;
+    
+    return JSCONE_SUCCESS;
+}
+
+i32 jscone_parser_parse_number(JsconeParser* parser, const char* name)
+{
+    f64 num = 0.0f;
+
+    /* actually parse number */
+
+    JsconeNode* node = jscone_node_create(parser->curr_node, JSCONE_NUM, (JsconeVal){.num = num});
+    node->name = name;
+    return JSCONE_SUCCESS;
+}
+
+i32 jscone_parser_parse_enum(JsconeParser* parser, const char* name)
+{
+    char str[5] = {0}; // 5 since false is max length enum name
+    u32 length = JSCONE_PARSER_TOKEN_LENGTH(parser);
+
+    if(length > 5 || length < 4)
+    {
+        return JSCONE_FAILURE;
+    }
+
+    JsconeType type;
+    JsconeVal value;
+    strncpy(str, &JSCONE_PARSER_GET_FIRST_CHAR(parser), length);
+    if(strcmp(str, "true") == 0)
+    {
+        type = JSCONE_BOOL;
+        value = (JsconeVal){.bool = JSCONE_TRUE};
+    }
+    else if(strcmp(str, "false") == 0)
+    {
+        type = JSCONE_BOOL;
+        value = (JsconeVal){.bool = JSCONE_FALSE};
+    }
+    else if(strcmp(str, "null") == 0)
+    {
+        type = JSCONE_NULL;
+        value = (JsconeVal)0;
+    }
+    else
+    {
+        return JSCONE_FAILURE;
+    }
+
+    JsconeNode* node = jscone_node_create(parser->curr_node, type, value);
+    node->name = name;
+
+    return JSCONE_SUCCESS;
+}
+
+/* lexing */
 
 i32 jscone_lexer_next_token(JsconeLexer* lexer)
 {
@@ -207,7 +375,9 @@ i32 jscone_lexer_next_token(JsconeLexer* lexer)
     while(JSCONE_TRUE)
     {
         if(lexer->curr.end >= lexer->length - 1)
+        {
             return JSCONE_SUCCESS;
+        }
 
         switch(lexer->json[lexer->curr.end])
         {
@@ -259,7 +429,9 @@ i32 jscone_lexer_lex_string(JsconeLexer* lexer)
     while(JSCONE_TRUE)
     {
         if(lexer->curr.end >= lexer->length - 1)
+        {
             return JSCONE_SUCCESS;
+        }
 
         switch(lexer->json[lexer->curr.end])
         {
@@ -277,7 +449,9 @@ i32 jscone_lexer_lex_string(JsconeLexer* lexer)
 
                 /* only end string if quote is not escaped */
                 if(!escaped)
+                {
                     return JSCONE_SUCCESS;
+                }
 
                 escaped = JSCONE_FALSE;
                 break;
@@ -296,22 +470,46 @@ i32 jscone_lexer_lex_string(JsconeLexer* lexer)
     }
 }
 
-JsconeNode* jscone_node_create(void)
+/* nodes */
+
+JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal value)
 {
     JsconeNode* node = (JsconeNode*)malloc(sizeof(JsconeNode));
 
-    node->parent = NULL;
+    node->parent = parent;
     node->child = NULL;
     node->prev = NULL;
     node->next = NULL;
-    node->type = JSCONE_NONE;
-    /* don't need to zero value since type is NONE */
+    node->type = type;
+    node->value = value;
+
+    // automatically insert child correctly if other children already exist
+    if(parent != NULL)
+    {
+        if(parent->child == NULL)
+        {
+            parent->child = node;
+            return node;
+        }
+
+        JsconeNode* last_child = parent->child;
+        while(last_child->next != NULL)
+        {
+            last_child = last_child->next;
+        }
+        last_child->next = node;
+        node->prev = last_child;
+    }
 
     return node;
 }
 
 void jscone_node_free(JsconeNode* node)
 {
+    if(node->name != NULL)
+    {
+        free(node->name);
+    }
     if(node->type == JSCONE_STRING && node->value.str != NULL)
     {
         free(node->value.str);
@@ -331,6 +529,16 @@ void jscone_node_free(JsconeNode* node)
     }
 
     free(node);
+}
+
+/* extracted this one function for cleanliness */
+
+char* copy_substring(char* first_char, u32 length)
+{
+    char* string = malloc(length * sizeof(char));
+
+    strncpy(string, first_char, length);
+    return string;
 }
 
 #endif
