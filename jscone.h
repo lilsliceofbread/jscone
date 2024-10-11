@@ -59,6 +59,10 @@ typedef struct JsconeNode
     JsconeVal value;
 } JsconeNode;
 
+/**
+ * exposed functions
+ */
+
 JsconeNode* jscone_parse(const char* json, u32 length);
 
 /**
@@ -129,12 +133,12 @@ i32 jscone_lexer_lex_string(JsconeLexer* lexer);
 JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal value);
 void jscone_node_free(JsconeNode* node);
 
-char* copy_substring(char* first_char, u32 length);
+char* remove_string_quotes(char* first_char, u32 length);
 
 
 
 /**
- * user functions
+ * exposed functions
  */
 
 JsconeNode* jscone_parse(const char* json, u32 length)
@@ -218,7 +222,7 @@ i32 jscone_parser_parse_object(JsconeParser* parser, const char* name)
         JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), '\"');
         JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_LAST_CHAR(parser), '\"');
 
-        curr_name = copy_substring(JSCONE_PARSER_TOKEN_LENGTH(parser), &JSCONE_PARSER_GET_FIRST_CHAR(parser));
+        curr_name = remove_string_quotes(&JSCONE_PARSER_GET_FIRST_CHAR(parser), JSCONE_PARSER_TOKEN_LENGTH(parser));
 
         JSCONE_PARSER_NEXT_TOKEN(parser);
         JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), ':');
@@ -281,7 +285,7 @@ i32 jscone_parser_parse_string(JsconeParser* parser, const char* name)
      * json strings allow escaping forward slashes "\/" and c doesn't
      * and I can't be bothered to handle that, lets hope it never comes up
      */
-    char* string = copy_substring(JSCONE_PARSER_TOKEN_LENGTH(parser), &JSCONE_PARSER_GET_FIRST_CHAR(parser));
+    char* string = remove_string_quotes(&JSCONE_PARSER_GET_FIRST_CHAR(parser), JSCONE_PARSER_TOKEN_LENGTH(parser));
 
     JsconeNode* node = jscone_node_create(parser->curr_node, JSCONE_STRING, (JsconeVal){.str = string});
     node->name = name;
@@ -533,11 +537,11 @@ void jscone_node_free(JsconeNode* node)
 
 /* extracted this one function for cleanliness */
 
-char* copy_substring(char* first_char, u32 length)
+char* remove_string_quotes(char* first_char, u32 length)
 {
     char* string = malloc(length * sizeof(char));
 
-    strncpy(string, first_char, length);
+    strncpy(string, first_char + 1, length - 1);
     return string;
 }
 
