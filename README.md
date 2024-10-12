@@ -4,9 +4,9 @@ WORK IN PROGRESS
 
 TODO:
 
-- create unit tests
+- unit test parse_object
 
-- finish parser (parse_number)
+- get parsing working
 
 - implement find function (paths)
 
@@ -27,6 +27,15 @@ resources used: [json.org's JSON flowchart](https://www.json.org/), [VoxelRift's
 - only parsing, no writing (yet)
 
 - creates n-ary tree of values
+
+include in your main file with:
+
+```
+#define JSCONE_IMPLEMENTATION // defines the functions in this file only
+#include "jscone.h"
+```
+
+and then you can include jscone.h in any other source files
 
 run example with:
 

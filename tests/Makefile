@@ -12,8 +12,10 @@ SOURCES := $(wildcard $(SRC_DIR)/*.c)
 OBJS := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SOURCES)) # subsitute .c files into obj path with .o
 DEPS := $(OBJS:.o=.d) # substitute .o for .d in all objs
 
-.PHONY: all directories clean
+.PHONY: all directories clean test run_test
 all: directories $(NAME)
+
+test: directories $(NAME) run_test
 
 directories:
 	mkdir -p $(BUILD_DIR)
@@ -23,6 +25,9 @@ clean:
 	rm -f $(OBJS)
 	rm -f $(DEPS)
 	rm -f $(BUILD_DIR)/$(NAME)
+
+run_test:
+	$(BUILD_DIR)/tests
 
 $(NAME): $(OBJS)	
 	$(CC) $(OBJS) -o $(BUILD_DIR)/$(NAME) $(LD_FLAGS)

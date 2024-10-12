@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -29,13 +30,13 @@ enum
 
 typedef enum
 {
-    JSCONE_NONE,
-    JSCONE_STRING,
-    JSCONE_NUM, 
-    JSCONE_BOOL, 
-    JSCONE_OBJECT, // won't contain any value
-    JSCONE_ARRAY,
     JSCONE_NULL,
+    JSCONE_BOOL, 
+    JSCONE_NUM, 
+    JSCONE_STRING,
+    JSCONE_OBJECT,
+    JSCONE_ARRAY,
+    JSCONE_TYPE_COUNT, // amount of types
 } JsconeType;
 
 typedef union
@@ -54,7 +55,7 @@ typedef struct JsconeNode
     struct JsconeNode* next;
     struct JsconeNode* prev;
 
-    char* name; // malloced
+    const char* name; // malloced
     JsconeType type;
     JsconeVal value;
 } JsconeNode;
@@ -82,6 +83,8 @@ void jscone_free(JsconeNode* parsed_json);
 /**
  * internal types and functions
  */
+
+#define CHAR_IS_NUMBER(character) ((u8)'0' <= (u8)character && (u8)character <= (u8)'9')
 
 /* shouldn't cause leaked memory as the output can still be freed */
 #define JSCONE_PARSER_NEXT_TOKEN(parser) if(jscone_lexer_next_token(&((parser)->lexer)) == JSCONE_FAILURE) return JSCONE_FAILURE; 
@@ -133,9 +136,11 @@ i32 jscone_lexer_lex_string(JsconeLexer* lexer);
 JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal value);
 void jscone_node_free(JsconeNode* node);
 
-char* remove_string_quotes(char* first_char, u32 length);
+char* remove_string_quotes(const char* first_char, u32 length);
 
 
+
+#ifdef JSCONE_IMPLEMENTATION
 
 /**
  * exposed functions
@@ -153,7 +158,11 @@ JsconeNode* jscone_parse(const char* json, u32 length)
         .curr_node = NULL,
     };
 
-    JSCONE_PARSER_NEXT_TOKEN(&parser);
+    // can't use macro because JSCONE_FAILURE != NULL
+    if(jscone_lexer_next_token(&parser.lexer) == JSCONE_FAILURE)
+    {
+        return NULL;
+    }
     jscone_parser_parse_object(&parser, NULL); // will return the root node
 
     return parser.curr_node;
@@ -210,7 +219,7 @@ i32 jscone_parser_parse_value(JsconeParser* parser, const char* name)
 i32 jscone_parser_parse_object(JsconeParser* parser, const char* name)
 {
     JsconeNode* node_before = parser->curr_node;
-    parser->curr_node = jscone_node_create(node_before, JSCONE_OBJECT, (JsconeVal)0);
+    parser->curr_node = jscone_node_create(node_before, JSCONE_OBJECT, (JsconeVal){0});
     parser->curr_node->name = name;
     char* curr_name = NULL;
 
@@ -228,7 +237,10 @@ i32 jscone_parser_parse_object(JsconeParser* parser, const char* name)
         JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), ':');
 
         JSCONE_PARSER_NEXT_TOKEN(parser);
-        jscone_parser_parse_value(parser, curr_name);
+        if(jscone_parser_parse_value(parser, curr_name) == JSCONE_FAILURE)
+        {
+            free((void*)curr_name);
+        }
 
         JSCONE_PARSER_NEXT_TOKEN(parser);
         if(JSCONE_PARSER_GET_FIRST_CHAR(parser) == ',')
@@ -253,7 +265,7 @@ i32 jscone_parser_parse_object(JsconeParser* parser, const char* name)
 i32 jscone_parser_parse_array(JsconeParser* parser, const char* name)
 {
     JsconeNode* node_before = parser->curr_node;
-    parser->curr_node = jscone_node_create(node_before, JSCONE_ARRAY, (JsconeVal)0);
+    parser->curr_node = jscone_node_create(node_before, JSCONE_ARRAY, (JsconeVal){0});
     parser->curr_node->name = name;
 
     /* caller should have already gone to next token */
@@ -299,6 +311,14 @@ i32 jscone_parser_parse_number(JsconeParser* parser, const char* name)
 
     /* actually parse number */
 
+    u32 length = parser->lexer.curr.end - parser->lexer.curr.first;
+    char* num_str = calloc(length + 1, sizeof(char));
+    strncpy(num_str, parser->lexer.json + parser->lexer.curr.first, length);
+
+    num = strtod(num_str, NULL);
+
+    free(num_str);
+
     JsconeNode* node = jscone_node_create(parser->curr_node, JSCONE_NUM, (JsconeVal){.num = num});
     node->name = name;
     return JSCONE_SUCCESS;
@@ -330,7 +350,7 @@ i32 jscone_parser_parse_enum(JsconeParser* parser, const char* name)
     else if(strcmp(str, "null") == 0)
     {
         type = JSCONE_NULL;
-        value = (JsconeVal)0;
+        value = (JsconeVal){0};
     }
     else
     {
@@ -361,7 +381,7 @@ i32 jscone_lexer_next_token(JsconeLexer* lexer)
         switch(lexer->json[lexer->curr.first])
         {
             case '\0':
-                return JSCONE_SUCCESS;
+                return JSCONE_FAILURE; // if no tokens left, fail
 
             case '\r': case '\n': case '\t': case ' ':
                 lexer->curr.first++;
@@ -378,7 +398,7 @@ i32 jscone_lexer_next_token(JsconeLexer* lexer)
 
     while(JSCONE_TRUE)
     {
-        if(lexer->curr.end >= lexer->length - 1)
+        if(lexer->curr.end > lexer->length - 1) // can be one past end
         {
             return JSCONE_SUCCESS;
         }
@@ -432,15 +452,15 @@ i32 jscone_lexer_lex_string(JsconeLexer* lexer)
 
     while(JSCONE_TRUE)
     {
-        if(lexer->curr.end >= lexer->length - 1)
+        if(lexer->curr.end > lexer->length - 1) // can be one past end
         {
-            return JSCONE_SUCCESS;
+            return JSCONE_FAILURE;
         }
 
         switch(lexer->json[lexer->curr.end])
         {
             case '\0':
-                return JSCONE_SUCCESS;
+                return JSCONE_FAILURE; // reached end of file before end of string
 
             case '\\':
                 /* toggle escaped incase it is escaping a backslash */
@@ -481,13 +501,14 @@ JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal va
     JsconeNode* node = (JsconeNode*)malloc(sizeof(JsconeNode));
 
     node->parent = parent;
+    node->type = type;
+    node->value = value;
     node->child = NULL;
     node->prev = NULL;
     node->next = NULL;
-    node->type = type;
-    node->value = value;
+    node->name = NULL;
 
-    // automatically insert child correctly if other children already exist
+    // automatically insert child correctly
     if(parent != NULL)
     {
         if(parent->child == NULL)
@@ -496,6 +517,7 @@ JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal va
             return node;
         }
 
+        // other children already exist
         JsconeNode* last_child = parent->child;
         while(last_child->next != NULL)
         {
@@ -510,19 +532,15 @@ JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal va
 
 void jscone_node_free(JsconeNode* node)
 {
-    if(node->name != NULL)
+    if(node->name != NULL && node->parent->type != JSCONE_ARRAY) // array sub-nodes have same name ptr as parent array node
     {
-        free(node->name);
+        free((void*)node->name);
     }
-    if(node->type == JSCONE_STRING && node->value.str != NULL)
+    if(node->value.str != NULL && node->type == JSCONE_STRING)
     {
         free(node->value.str);
     }
 
-    if(node->prev != NULL)
-    {
-        jscone_node_free(node->prev);
-    }
     if(node->next != NULL)
     {
         jscone_node_free(node->next);
@@ -537,12 +555,14 @@ void jscone_node_free(JsconeNode* node)
 
 /* extracted this one function for cleanliness */
 
-char* remove_string_quotes(char* first_char, u32 length)
+char* remove_string_quotes(const char* first_char, u32 length)
 {
-    char* string = malloc(length * sizeof(char));
+    char* string = calloc(length, sizeof(char));
 
-    strncpy(string, first_char + 1, length - 1);
+    strncpy(string, first_char + 1, length - 2);
     return string;
 }
+
+#endif
 
 #endif
