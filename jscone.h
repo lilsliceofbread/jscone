@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -21,6 +20,10 @@ typedef double f64;
 
 #define JSCONE_TRUE 1
 #define JSCONE_FALSE 0 
+
+/* for jscone_print() */
+#define JSCONE_MAX_INDENT 8
+#define JSCONE_INDENT_SIZE 4
 
 enum
 {
@@ -68,9 +71,9 @@ JsconeNode* jscone_parse(const char* json, u32 length);
 
 /**
  * @brief    finds node at specified path e.g "world/player_data"
- * @returns  pointer to node at path, or if it is an array, one of the children.
+ * @returns  pointer to node at path
  */
-JsconeNode* jscone_find(JsconeNode* root, const char* path);
+JsconeNode* jscone_find(JsconeNode* parsed_json, const char* path);
 
 /**
  * @brief  frees output from jscone_parse. call when you are done with it.
@@ -78,13 +81,16 @@ JsconeNode* jscone_find(JsconeNode* root, const char* path);
  */
 void jscone_free(JsconeNode* parsed_json);
 
+/**
+ * @brief  prints out tree of parsed_json
+ * @note   slow, should be used for debugging purposes only
+ */
+void jscone_print(JsconeNode* parsed_json);
 
 
 /**
  * internal types and functions
  */
-
-#define CHAR_IS_NUMBER(character) ((u8)'0' <= (u8)character && (u8)character <= (u8)'9')
 
 /* shouldn't cause leaked memory as the output can still be freed */
 #define JSCONE_PARSER_NEXT_TOKEN(parser) if(jscone_lexer_next_token(&((parser)->lexer)) == JSCONE_FAILURE) return JSCONE_FAILURE; 
@@ -92,11 +98,11 @@ void jscone_free(JsconeNode* parsed_json);
 #define JSCONE_PARSER_GET_FIRST_CHAR(parser) ((parser)->lexer.json[(parser)->lexer.curr.first])
 #define JSCONE_PARSER_GET_LAST_CHAR(parser) ((parser)->lexer.json[(parser)->lexer.curr.end - 1])
 
-#define JSCONE_ERROR(msg, ...) fprintf(stderr,"JSCONE: " msg,##__VA_ARGS__)
+#define JSCONE_ERROR(msg, ...) fprintf(stderr,"[JSCONE]: " msg,##__VA_ARGS__)
 #define JSCONE_EXPECT_CHAR(char, expected) \
 if(char != expected)                                  \
 {                                                     \
-    JSCONE_ERROR("expected char %c", expected);       \
+    JSCONE_ERROR("expected char %c\n", expected);       \
     return JSCONE_FAILURE;                            \
 }
 
@@ -135,12 +141,14 @@ i32 jscone_lexer_lex_string(JsconeLexer* lexer);
 
 JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal value);
 void jscone_node_free(JsconeNode* node);
-
-char* remove_string_quotes(const char* first_char, u32 length);
+void jscone_node_print(JsconeNode* node, u32 indent);
 
 
 
 #ifdef JSCONE_IMPLEMENTATION
+
+static const char* jscone_get_type_name(JsconeType type);
+char* jscone_remove_string_quotes(const char* first_char, u32 length);
 
 /**
  * exposed functions
@@ -168,6 +176,14 @@ JsconeNode* jscone_parse(const char* json, u32 length)
     return parser.curr_node;
 }
 
+// TODO
+/* 
+JsconeNode* jscone_find(JsconeNode* root, const char* path)
+{
+
+}
+*/
+
 void jscone_free(JsconeNode* parsed_json)
 {
     /* find top node */
@@ -178,6 +194,11 @@ void jscone_free(JsconeNode* parsed_json)
     }
 
     jscone_node_free(head);
+}
+
+void jscone_print(JsconeNode* parsed_json)
+{
+    jscone_node_print(parsed_json, 0);
 }
 
 
@@ -231,7 +252,7 @@ i32 jscone_parser_parse_object(JsconeParser* parser, const char* name)
         JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), '\"');
         JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_LAST_CHAR(parser), '\"');
 
-        curr_name = remove_string_quotes(&JSCONE_PARSER_GET_FIRST_CHAR(parser), JSCONE_PARSER_TOKEN_LENGTH(parser));
+        curr_name = jscone_remove_string_quotes(&JSCONE_PARSER_GET_FIRST_CHAR(parser), JSCONE_PARSER_TOKEN_LENGTH(parser));
 
         JSCONE_PARSER_NEXT_TOKEN(parser);
         JSCONE_EXPECT_CHAR(JSCONE_PARSER_GET_FIRST_CHAR(parser), ':');
@@ -297,7 +318,7 @@ i32 jscone_parser_parse_string(JsconeParser* parser, const char* name)
      * json strings allow escaping forward slashes "\/" and c doesn't
      * and I can't be bothered to handle that, lets hope it never comes up
      */
-    char* string = remove_string_quotes(&JSCONE_PARSER_GET_FIRST_CHAR(parser), JSCONE_PARSER_TOKEN_LENGTH(parser));
+    char* string = jscone_remove_string_quotes(&JSCONE_PARSER_GET_FIRST_CHAR(parser), JSCONE_PARSER_TOKEN_LENGTH(parser));
 
     JsconeNode* node = jscone_node_create(parser->curr_node, JSCONE_STRING, (JsconeVal){.str = string});
     node->name = name;
@@ -308,8 +329,6 @@ i32 jscone_parser_parse_string(JsconeParser* parser, const char* name)
 i32 jscone_parser_parse_number(JsconeParser* parser, const char* name)
 {
     f64 num = 0.0f;
-
-    /* actually parse number */
 
     u32 length = parser->lexer.curr.end - parser->lexer.curr.first;
     char* num_str = calloc(length + 1, sizeof(char));
@@ -375,7 +394,7 @@ i32 jscone_lexer_next_token(JsconeLexer* lexer)
         if(lexer->curr.first >= lexer->length - 1)
         {
             lexer->curr.end = lexer->curr.first;
-            return JSCONE_SUCCESS;
+            return JSCONE_SUCCESS; // still thinking about this one. should not matter because root object should end before EOF anyway
         }
 
         switch(lexer->json[lexer->curr.first])
@@ -452,15 +471,15 @@ i32 jscone_lexer_lex_string(JsconeLexer* lexer)
 
     while(JSCONE_TRUE)
     {
-        if(lexer->curr.end > lexer->length - 1) // can be one past end
+        if(lexer->curr.end > lexer->length - 1) // one past end
         {
-            return JSCONE_FAILURE;
+            return JSCONE_FAILURE; // reached EOF before end of string
         }
 
         switch(lexer->json[lexer->curr.end])
         {
             case '\0':
-                return JSCONE_FAILURE; // reached end of file before end of string
+                return JSCONE_FAILURE; // reached EOF before end of string
 
             case '\\':
                 /* toggle escaped incase it is escaping a backslash */
@@ -553,9 +572,63 @@ void jscone_node_free(JsconeNode* node)
     free(node);
 }
 
-/* extracted this one function for cleanliness */
+void jscone_node_print(JsconeNode* node, u32 indent)
+{
+    char indent_str[JSCONE_MAX_INDENT * JSCONE_INDENT_SIZE] = {0};
+    if(indent > JSCONE_MAX_INDENT)
+    {
+        JSCONE_ERROR("cannot print json output, beyond max indentation\n");
+        return;
+    }
 
-char* remove_string_quotes(const char* first_char, u32 length)
+    if(node->name == NULL && indent == 0)
+    {
+        printf("root node/object\n");
+    }
+
+    memset(indent_str, ' ', indent * JSCONE_INDENT_SIZE);
+
+    if(node->prev != NULL && node->prev->child == NULL)
+    {
+        printf("%s============\n", indent_str);
+    }
+
+    printf("%sname: %s\n", indent_str, node->name);
+
+    printf("%stype: %s\n", indent_str, jscone_get_type_name(node->type));
+
+    switch(node->type)
+    {
+        case JSCONE_STRING:
+            printf("%svalue: %s\n", indent_str, node->value.str);
+            break;
+        case JSCONE_NUM:
+            printf("%svalue: %lf\n", indent_str, node->value.num);
+            break;
+        case JSCONE_BOOL:
+            printf("%svalue: %s\n", indent_str, node->value.bool ? "true" : "false");
+            break;
+        default: break;
+    }
+
+    if(node->child != NULL)
+    {
+        jscone_node_print(node->child, indent + 1);
+    }
+
+    if(node->next != NULL)
+    {
+        jscone_node_print(node->next, indent);
+    }
+}
+
+static const char* jscone_get_type_name(JsconeType type)
+{
+    static const char* type_names[JSCONE_TYPE_COUNT] = {"NULL", "BOOL", "NUM", "STRING", "OBJECT", "ARRAY"};
+    return type_names[type];
+}
+
+char* jscone_remove_string_quotes(const char* first_char, u32 length)
 {
     char* string = calloc(length, sizeof(char));
 

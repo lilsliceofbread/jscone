@@ -4,10 +4,6 @@ WORK IN PROGRESS
 
 TODO:
 
-- unit test parse_object
-
-- get parsing working
-
 - implement find function (paths)
 
 - pool memory instead of many mallocs
@@ -41,6 +37,5 @@ run example with:
 
 ```
 cd example
-chmod +x ./run.sh
-./run.sh
+make run
 ```

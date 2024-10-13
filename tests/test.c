@@ -36,7 +36,7 @@ void test_print(u8 num, const char* msg)
             break;
         case TEST_ASSERT_FAIL:
             colour = FAILED_COLOUR;
-            prefix = "[ASSERT FAIL]";
+            prefix = "[ASSERT FAILED]";
             break;
     }
 

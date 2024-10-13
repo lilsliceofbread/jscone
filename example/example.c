@@ -1,3 +1,4 @@
+#define JSCONE_IMPLEMENTATION
 #include "jscone.h"
 #include <string.h>
 #include <stdlib.h>
@@ -23,23 +24,13 @@ int main(void)
 
     fclose(file);
 
-    /* parser WIP: testing lexing */
 
-    JsconeLexer lexer = {
-        .json = json,
-        .length = file_size,
-        .curr = {.first = 0, .end = 0},
-    };
 
-    char buffer[128];
-    while(jscone_lexer_next_token(&lexer) != JSCONE_FAILURE)
-    {
-        memset(buffer, 0, 128);
-        memcpy(buffer, lexer.json + lexer.curr.first, lexer.curr.end - lexer.curr.first);
+    JsconeNode* result = jscone_parse(json, file_size);
 
-        printf("%s\n", buffer);
-    }
+    jscone_print(result);
 
+    jscone_free(result);
     free(json);
 
     return 0;

@@ -176,14 +176,14 @@ TEST(parse_one_item_array)
 TEST(parse_complex_array)
 {
     JsconeNode* node = jscone_node_create(NULL, JSCONE_NULL, (JsconeVal){0});
-    const char* test_string = "[false, \"element 2\", true, [\"yes\", null]]"; // ! replace with numbers later
-    JsconeType expected_types[5] = {JSCONE_BOOL, JSCONE_STRING, JSCONE_BOOL, JSCONE_STRING, JSCONE_NULL};
+    const char* test_string = "[42, \"element 2\", true, [\"yes\", 3.50]]";
+    JsconeType expected_types[5] = {JSCONE_NUM, JSCONE_STRING, JSCONE_BOOL, JSCONE_STRING, JSCONE_NUM};
     JsconeVal values[5] = {
-        (JsconeVal){.bool = JSCONE_FALSE},
+        (JsconeVal){.num = 42.0},
         (JsconeVal){.str = "element 2"},
         (JsconeVal){.bool = JSCONE_TRUE},
         (JsconeVal){.str = "yes"},
-        (JsconeVal){0},
+        (JsconeVal){.num = 3.5},
     };
     JsconeParser parser = {
         .lexer = {
@@ -237,19 +237,126 @@ TEST(parse_complex_array)
 
 TEST(parse_empty_object)
 {
-    // TODO
+    JsconeNode* node = jscone_node_create(NULL, JSCONE_NULL, (JsconeVal){0});
+    const char* test_string = "{}";
+    JsconeParser parser = {
+        .lexer = {
+            .json = test_string,
+            .length = (u32)strlen(test_string),
+            .curr = {.first = 0, .end = 0},
+        },
+        .curr_node = node,
+    };
+
+    const char* name = "object";
+
+    TEST_ASSERT(jscone_lexer_next_token(&parser.lexer) == JSCONE_SUCCESS);
+
+    jscone_parser_parse_object(&parser, test_parser_allocate_string(name));
+
+    TEST_ASSERT(parser.curr_node == node); // should be reset by jscone_parser_parse_object
+
+    JsconeNode* object = node->child;
+    TEST_ASSERT(object->type == JSCONE_OBJECT);
+    TEST_ASSERT_STREQUAL(object->name, name);
+    TEST_ASSERT(object->child == NULL);
+
+    jscone_node_free(node);
+
     return TEST_SUCCESS;
 }
 
 TEST(parse_one_item_object)
 {
-    // TODO
+    JsconeNode* node = jscone_node_create(NULL, JSCONE_NULL, (JsconeVal){0});
+    const char* test_string = "{\"element\": 9}";
+    JsconeParser parser = {
+        .lexer = {
+            .json = test_string,
+            .length = (u32)strlen(test_string),
+            .curr = {.first = 0, .end = 0},
+        },
+        .curr_node = node,
+    };
+
+    TEST_ASSERT(jscone_lexer_next_token(&parser.lexer) == JSCONE_SUCCESS);
+
+    TEST_ASSERT(jscone_parser_parse_object(&parser, NULL) == JSCONE_SUCCESS);
+
+    JsconeNode* object = node->child;
+    TEST_ASSERT(object->child != NULL);
+
+    TEST_ASSERT(object->child->type == JSCONE_NUM);
+    TEST_ASSERT_STREQUAL(object->child->name, "element");
+    TEST_ASSERT(object->child->value.num == 9.0);
+    TEST_ASSERT(object->child->next == NULL);
+
+    jscone_node_free(node);
+
     return TEST_SUCCESS;
 }
 
 TEST(parse_complex_object)
 {
-    // TODO
+    JsconeNode* node = jscone_node_create(NULL, JSCONE_NULL, (JsconeVal){0});
+    const char* test_string = "{\"name1\": 42, \"name2\": \"element 2\", \"name3\": true, \"name4\": {\"name5\": \"yes\", \"name6\": 3.50}}";
+    JsconeType expected_types[5] = {JSCONE_NUM, JSCONE_STRING, JSCONE_BOOL, JSCONE_STRING, JSCONE_NUM};
+    JsconeVal values[5] = {
+        (JsconeVal){.num = 42.0},
+        (JsconeVal){.str = "element 2"},
+        (JsconeVal){.bool = JSCONE_TRUE},
+        (JsconeVal){.str = "yes"},
+        (JsconeVal){.num = 3.5},
+    };
+    JsconeParser parser = {
+        .lexer = {
+            .json = test_string,
+            .length = (u32)strlen(test_string),
+            .curr = {.first = 0, .end = 0},
+        },
+        .curr_node = node,
+    };
+
+    TEST_ASSERT(jscone_lexer_next_token(&parser.lexer) == JSCONE_SUCCESS);
+
+    TEST_ASSERT(jscone_parser_parse_object(&parser, NULL) == JSCONE_SUCCESS);
+
+    JsconeNode* object = node->child;
+    TEST_ASSERT(object->child != NULL);
+    JsconeNode* child = object->child;
+
+    char expected_name[6] = "name1";
+    for(int i = 0; i < 3; i++)
+    {
+        TEST_ASSERT_STREQUAL(child->name, expected_name);
+        TEST_ASSERT(child->type == expected_types[i]);
+        TEST_ASSERT_VALUES_EQUAL(child, values[i]);
+
+        TEST_ASSERT(child->next != NULL);
+        child = child->next;
+        expected_name[4]++;
+    }
+
+    // now on 4th element, which should be nested object
+    object = child;
+    TEST_ASSERT(object->type == JSCONE_OBJECT);
+    TEST_ASSERT_STREQUAL(object->name, expected_name);
+    TEST_ASSERT(object->child != NULL);
+    child = object->child;
+    expected_name[4]++;
+
+    for(int i = 3; i < 5; i++)
+    {
+        TEST_ASSERT_STREQUAL(child->name, expected_name);
+        TEST_ASSERT(child->type == expected_types[i]);
+        TEST_ASSERT_VALUES_EQUAL(child, values[i]);
+
+        child = child->next;
+        expected_name[4]++;
+    }
+
+    jscone_node_free(node);
+
     return TEST_SUCCESS;
 }
 
