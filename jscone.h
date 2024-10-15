@@ -67,25 +67,30 @@ typedef struct JsconeNode
  * exposed functions
  */
 
+/**
+ * @param  length:  length of json string
+ * @returns         root node/object
+ */
 JsconeNode* jscone_parse(const char* json, u32 length);
 
 /**
  * @brief    finds node at specified path e.g "world/player_data"
+ * @note     use backslash \ to escape in names that contain forward slashes
  * @returns  pointer to node at path
  */
-JsconeNode* jscone_find(JsconeNode* parsed_json, const char* path);
+JsconeNode* jscone_find(JsconeNode* node, const char* path);
 
 /**
  * @brief  frees output from jscone_parse. call when you are done with it.
  * @note   pass any node from the output, the function will free them all
  */
-void jscone_free(JsconeNode* parsed_json);
+void jscone_free(JsconeNode* node);
 
 /**
- * @brief  prints out tree of parsed_json
+ * @brief  prints out tree of specific node
  * @note   slow, should be used for debugging purposes only
  */
-void jscone_print(JsconeNode* parsed_json);
+void jscone_print(JsconeNode* node);
 
 
 /**
@@ -314,10 +319,13 @@ i32 jscone_parser_parse_array(JsconeParser* parser, const char* name)
 
 i32 jscone_parser_parse_string(JsconeParser* parser, const char* name)
 {
-    /**
-     * json strings allow escaping forward slashes "\/" and c doesn't
-     * and I can't be bothered to handle that, lets hope it never comes up
-     */
+    // TODO: handle escaping
+    // consider malloc-realloc
+    // escaped != escaped
+    // 0-9 char - '0'
+    // a-f char - 'a' + 10
+    // A-F char - 'A' + 10
+    // else JSCONE_FAILURE
     char* string = jscone_remove_string_quotes(&JSCONE_PARSER_GET_FIRST_CHAR(parser), JSCONE_PARSER_TOKEN_LENGTH(parser));
 
     JsconeNode* node = jscone_node_create(parser->curr_node, JSCONE_STRING, (JsconeVal){.str = string});
@@ -330,7 +338,7 @@ i32 jscone_parser_parse_number(JsconeParser* parser, const char* name)
 {
     f64 num = 0.0f;
 
-    u32 length = parser->lexer.curr.end - parser->lexer.curr.first;
+    u32 length = JSCONE_PARSER_TOKEN_LENGTH(parser);
     char* num_str = calloc(length + 1, sizeof(char));
     strncpy(num_str, parser->lexer.json + parser->lexer.curr.first, length);
 
@@ -345,7 +353,7 @@ i32 jscone_parser_parse_number(JsconeParser* parser, const char* name)
 
 i32 jscone_parser_parse_enum(JsconeParser* parser, const char* name)
 {
-    char str[5] = {0}; // 5 since false is max length enum name
+    const char* token_start = parser->lexer.json + parser->lexer.curr.first;
     u32 length = JSCONE_PARSER_TOKEN_LENGTH(parser);
 
     if(length > 5 || length < 4)
@@ -355,18 +363,17 @@ i32 jscone_parser_parse_enum(JsconeParser* parser, const char* name)
 
     JsconeType type;
     JsconeVal value;
-    strncpy(str, &JSCONE_PARSER_GET_FIRST_CHAR(parser), length);
-    if(strcmp(str, "true") == 0)
+    if(strncmp(token_start, "true", length) == 0)
     {
         type = JSCONE_BOOL;
         value = (JsconeVal){.bool = JSCONE_TRUE};
     }
-    else if(strcmp(str, "false") == 0)
+    else if(strncmp(token_start, "false", length) == 0)
     {
         type = JSCONE_BOOL;
         value = (JsconeVal){.bool = JSCONE_FALSE};
     }
-    else if(strcmp(str, "null") == 0)
+    else if(strncmp(token_start, "null", length) == 0)
     {
         type = JSCONE_NULL;
         value = (JsconeVal){0};
@@ -583,32 +590,29 @@ void jscone_node_print(JsconeNode* node, u32 indent)
 
     if(node->name == NULL && indent == 0)
     {
-        printf("root node/object\n");
+        printf("(root node/object) ");
     }
 
     memset(indent_str, ' ', indent * JSCONE_INDENT_SIZE);
 
-    if(node->prev != NULL && node->prev->child == NULL)
-    {
-        printf("%s============\n", indent_str);
-    }
+    printf("%sname: %s, ", indent_str, node->name);
 
-    printf("%sname: %s\n", indent_str, node->name);
-
-    printf("%stype: %s\n", indent_str, jscone_get_type_name(node->type));
+    printf("type: %s, ", jscone_get_type_name(node->type));
 
     switch(node->type)
     {
         case JSCONE_STRING:
-            printf("%svalue: %s\n", indent_str, node->value.str);
+            printf("value: %s\n", node->value.str);
             break;
         case JSCONE_NUM:
-            printf("%svalue: %lf\n", indent_str, node->value.num);
+            printf("value: %lf\n", node->value.num);
             break;
         case JSCONE_BOOL:
-            printf("%svalue: %s\n", indent_str, node->value.bool ? "true" : "false");
+            printf("value: %s\n", node->value.bool ? "true" : "false");
             break;
-        default: break;
+        default: 
+            printf("\b\b \n"); // back twice to overwrite comma with space so no trailing comma
+            break;
     }
 
     if(node->child != NULL)

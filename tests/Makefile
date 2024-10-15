@@ -4,6 +4,11 @@ CC_FLAGS := -g -Wall -Wpedantic -Wextra -Wconversion -O2 # compiler flags
 CPP_FLAGS := -MMD -MP -I../ # preprocessor flags
 LD_FLAGS := #-lm
 
+IS_WIN=0
+ifeq ($(OS),Windows_NT)
+	IS_WIN=1
+endif
+
 BUILD_DIR := ../build/$(NAME)
 OBJ_DIR := $(BUILD_DIR)/obj
 SRC_DIR := .
@@ -18,8 +23,17 @@ all: directories $(NAME)
 test: directories $(NAME) run_test
 
 directories:
+ifeq ($(IS_WIN),1)
+ifeq ("$(wildcard $(BUILD_DIR))","")
+	cmd.exe /c mkdir $(subst /,\,$(BUILD_DIR))
+endif
+ifeq ("$(wildcard $(OBJ_DIR))","")
+	cmd.exe /c mkdir $(subst /,\,$(OBJ_DIR))
+endif
+else
 	mkdir -p $(BUILD_DIR)
 	mkdir -p $(OBJ_DIR)
+endif
 
 clean:
 	rm -f $(OBJS)

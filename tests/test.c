@@ -17,8 +17,8 @@
 
 void test_print(u8 num, const char* msg)
 {
-    int colour;
-    const char* prefix;
+    int colour = 0;
+    const char* prefix = "";
 
     switch(num)
     {
@@ -43,13 +43,12 @@ void test_print(u8 num, const char* msg)
     // set colour for prefix
     #ifdef _WIN32
         CONSOLE_SCREEN_BUFFER_INFO cb_info;
-        HANDLE console_handle = (output_stream == stderr)
-                              ? GetStdHandle(STD_ERROR_HANDLE) : GetStdHandle(STD_OUTPUT_HANDLE);
+        HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
         GetConsoleScreenBufferInfo(console_handle, &cb_info);
         int original_colour = cb_info.wAttributes;
 
         SetConsoleTextAttribute(console_handle, (WORD)colour);
-            fprintf(output_stream, "%s: ", prefix);
+            printf("%s: ", prefix);
         SetConsoleTextAttribute(console_handle, (WORD)original_colour);
     #else
         printf("\x1B[%dm%s:\x1B[0m ", colour, prefix);

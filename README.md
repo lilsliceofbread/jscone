@@ -4,6 +4,8 @@ WORK IN PROGRESS
 
 TODO:
 
+- strip backslashes from string
+
 - implement find function (paths)
 
 - pool memory instead of many mallocs
