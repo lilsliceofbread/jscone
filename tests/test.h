@@ -62,7 +62,7 @@ static u8 test_##func_name(void)
 #endif
 
 /**
- * internal functions
+ * internal stuff
  */
 
 #define TEST_ASSERT_FAIL 3

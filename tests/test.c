@@ -51,7 +51,7 @@ void test_print(u8 num, const char* msg)
             printf("%s: ", prefix);
         SetConsoleTextAttribute(console_handle, (WORD)original_colour);
     #else
-        printf("\x1B[%dm%s:\x1B[0m ", colour, prefix);
+        printf("\x1B[0m\x1B[%dm%s:\x1B[0m ", colour, prefix);
     #endif
 
     printf("%s\n", msg);

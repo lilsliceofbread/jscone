@@ -2,16 +2,12 @@
 #include "jscone.h"
 #include "test_utils.h"
 
-/**
- * helper functions
- */
-
 BEGIN_TESTS()
 
 TEST(parse_string)
 {
     JsconeNode* node = jscone_node_create(NULL, JSCONE_NULL, (JsconeVal){0});
-    const char* test_string = "\"test123\" \"missing quote";
+    const char* test_string = "\"\\\"\\n\\r\\t\\f\\/test1234\\b\\u1234\" \"missing quote";
     JsconeParser parser = {
         .lexer = {
             .json = test_string,
@@ -22,16 +18,16 @@ TEST(parse_string)
     };
 
     TEST_ASSERT(jscone_lexer_next_token(&parser.lexer) == JSCONE_SUCCESS);
-    TEST_ASSERT(parser.lexer.curr.first == 0 && parser.lexer.curr.end == 9);
+    TEST_ASSERT(parser.lexer.curr.first == 0 && test_string[parser.lexer.curr.end - 1] == '\"');
 
     jscone_parser_parse_string(&parser, NULL); // always returns SUCCESS
     TEST_ASSERT(node->child->type == JSCONE_STRING);
-    TEST_ASSERT_STREQUAL(node->child->value.str, "test123");
+    TEST_ASSERT_STREQUAL(node->child->value.str, "\"\n\r\t\f/test1234\b?");
 
     jscone_node_free(node);
 
     TEST_ASSERT(jscone_lexer_next_token(&parser.lexer) == JSCONE_FAILURE);
-    TEST_ASSERT(parser.lexer.curr.first == 10 && parser.lexer.curr.end == strlen(test_string));
+    TEST_ASSERT(test_string[parser.lexer.curr.first] == '"' && test_string[parser.lexer.curr.end - 1] == 'e');
 
     return TEST_SUCCESS;
 }

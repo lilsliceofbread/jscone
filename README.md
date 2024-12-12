@@ -4,9 +4,11 @@ WORK IN PROGRESS
 
 TODO:
 
-- strip backslashes from string
-
 - implement find function (paths)
+
+-
+
+- add unicode escape sequence support
 
 - pool memory instead of many mallocs
 

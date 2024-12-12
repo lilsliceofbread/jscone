@@ -154,6 +154,9 @@ void jscone_node_print(JsconeNode* node, u32 indent);
 
 static const char* jscone_get_type_name(JsconeType type);
 char* jscone_remove_string_quotes(const char* first_char, u32 length);
+u16 jscone_parse_escape_sequence(JsconeParser* parser, u32 offset);
+
+//static u16 powers_of_16[4] = {4096, 256, 16, 1};
 
 /**
  * exposed functions
@@ -181,13 +184,16 @@ JsconeNode* jscone_parse(const char* json, u32 length)
     return parser.curr_node;
 }
 
-// TODO
-/* 
 JsconeNode* jscone_find(JsconeNode* root, const char* path)
 {
+    // for loop until next / or \\
+    // search through next ptr for name
+    // return NULL if none
+    
+    JsconeNode* node;
 
+    return node;
 }
-*/
 
 void jscone_free(JsconeNode* parsed_json)
 {
@@ -319,14 +325,59 @@ i32 jscone_parser_parse_array(JsconeParser* parser, const char* name)
 
 i32 jscone_parser_parse_string(JsconeParser* parser, const char* name)
 {
-    // TODO: handle escaping
-    // consider malloc-realloc
-    // escaped != escaped
-    // 0-9 char - '0'
-    // a-f char - 'a' + 10
-    // A-F char - 'A' + 10
-    // else JSCONE_FAILURE
-    char* string = jscone_remove_string_quotes(&JSCONE_PARSER_GET_FIRST_CHAR(parser), JSCONE_PARSER_TOKEN_LENGTH(parser));
+    u32 length = JSCONE_PARSER_TOKEN_LENGTH(parser);
+    char* string = (char*)calloc(length - 1, sizeof(char));
+
+    char c;
+    u32 str_i = 0; 
+    u8 escaped = JSCONE_FALSE;
+    for(u32 i = 1; i < length; i++)
+    {
+        c = parser->lexer.json[parser->lexer.curr.first + i];
+        if(c == '\\')
+        {
+            if(escaped)
+            {
+                string[str_i++] = c;
+            }
+            escaped = !escaped;
+            continue;
+        }
+        else if(c == '\"')
+        {
+            if(!escaped)
+            {
+                goto end_loop;
+            }
+            string[str_i++] = c;
+            escaped = !escaped;
+            continue;
+        }
+
+        if(escaped)
+        {
+            if(c == 'u')
+            {
+                JSCONE_ERROR("unicode escape sequence not supported yet\n");
+                i += 4;
+                string[str_i++] = '?';
+                escaped = JSCONE_FALSE;
+                continue;
+            }
+
+            u16 bytes = jscone_parse_escape_sequence(parser, i);
+
+            string[str_i++] = (char)bytes;
+            escaped = JSCONE_FALSE;
+            continue;
+        }
+        string[str_i++] = c;
+    }
+    
+    end_loop:
+    string[str_i] = '\0';
+
+    string = realloc(string, (str_i + 1) * sizeof(char));
 
     JsconeNode* node = jscone_node_create(parser->curr_node, JSCONE_STRING, (JsconeVal){.str = string});
     node->name = name;
@@ -358,6 +409,7 @@ i32 jscone_parser_parse_enum(JsconeParser* parser, const char* name)
 
     if(length > 5 || length < 4)
     {
+        JSCONE_ERROR("characters wrong size to be true/false/null\n");
         return JSCONE_FAILURE;
     }
 
@@ -380,6 +432,7 @@ i32 jscone_parser_parse_enum(JsconeParser* parser, const char* name)
     }
     else
     {
+        JSCONE_ERROR("characters do not match true/false/null\n");
         return JSCONE_FAILURE;
     }
 
@@ -588,7 +641,7 @@ void jscone_node_print(JsconeNode* node, u32 indent)
         return;
     }
 
-    if(node->name == NULL && indent == 0)
+    if(node->name == NULL && node->parent == NULL)
     {
         printf("(root node/object) ");
     }
@@ -634,10 +687,63 @@ static const char* jscone_get_type_name(JsconeType type)
 
 char* jscone_remove_string_quotes(const char* first_char, u32 length)
 {
-    char* string = calloc(length, sizeof(char));
+    char* string = (char*)calloc(length - 1, sizeof(char));
 
     strncpy(string, first_char + 1, length - 2);
     return string;
+}
+
+u16 jscone_parse_escape_sequence(JsconeParser* parser, u32 offset)
+{
+    u16 bytes = 0;
+
+    const char* cp = &parser->lexer.json[parser->lexer.curr.first + offset];
+    switch(*cp)
+    {
+        case '/':
+            bytes = (u16)*cp;
+            break;
+        case 'b':
+            bytes = '\b';
+            break;
+        case 'f':
+            bytes = '\f';
+            break;
+        case 'n':
+            bytes = '\n';
+            break;
+        case 'r':
+            bytes = '\r';
+            break;
+        case 't':
+            bytes = '\t';
+            break;
+        /*case 'u':
+            for(u32 i = 0; i < 4; i++)
+            {
+                cp++;
+                char c = *cp;
+
+                if('0' <= c && c <= '9')
+                {
+                    bytes += ((u16)c - (u16)'0') * powers_of_16[i];
+                }
+                else if('a' <= c && c <= 'f')
+                {
+                    bytes += ((u16)c - (u16)'a' + 10) * powers_of_16[i];
+                }
+                else if('A' <= c && c <= 'F')
+                {
+                    bytes += ((u16)c - (u16)'A' + 10) * powers_of_16[i];
+                }
+            }
+            break;*/
+        default:
+            JSCONE_ERROR("invalid escape sequence char %c\n", *cp);
+            return '?'; // best i can think of
+    }
+
+    return bytes;
 }
 
 #endif

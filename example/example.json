@@ -27,6 +27,6 @@
         "null": null,
         "true": true,
         "false": false,
-        "escaped": "\"yuppity\\"
+        "escaped": "\"\\/yuppity\/\\\""
     }
 }}    
