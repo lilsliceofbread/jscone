@@ -7,7 +7,7 @@ BEGIN_TESTS()
 TEST(parse_string)
 {
     JsconeNode* node = jscone_node_create(NULL, JSCONE_NULL, (JsconeVal){0});
-    const char* test_string = "\"\\\"\\n\\r\\t\\f\\/test1234\\b\\u1234\" \"missing quote";
+    const char* test_string = "\"\\\"\\n\\r\\t\\f\\/test1234\\b\\u0906\" \"missing quote";
     JsconeParser parser = {
         .lexer = {
             .json = test_string,
@@ -22,7 +22,7 @@ TEST(parse_string)
 
     jscone_parser_parse_string(&parser, NULL); // always returns SUCCESS
     TEST_ASSERT(node->child->type == JSCONE_STRING);
-    TEST_ASSERT_STREQUAL(node->child->value.str, "\"\n\r\t\f/test1234\b?");
+    TEST_ASSERT_STREQUAL(node->child->value.str, "\"\n\r\t\f/test1234\b\u0906");
 
     jscone_node_free(node);
 

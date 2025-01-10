@@ -6,9 +6,7 @@ TODO:
 
 - implement find function (paths)
 
--
-
-- add unicode escape sequence support
+- use json tester to find errors
 
 - pool memory instead of many mallocs
 
@@ -16,9 +14,7 @@ TODO:
 
 - optionally separate c file
 
-- optimise?
-
-my attempt a json parser in c
+my bad attempt a json parser in c
 
 resources used: [json.org's JSON flowchart](https://www.json.org/), [VoxelRift's video about parsing mathematical expressions](https://youtu.be/myZcNjKcVGw)
 
@@ -27,6 +23,8 @@ resources used: [json.org's JSON flowchart](https://www.json.org/), [VoxelRift's
 - only parsing, no writing (yet)
 
 - creates n-ary tree of values
+
+- can only handle unicode up to 0xFFFF
 
 include in your main file with:
 

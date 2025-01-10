@@ -27,6 +27,16 @@
         "null": null,
         "true": true,
         "false": false,
-        "escaped": "\"\\/yuppity\/\\\""
+        "escaped": "\"\\/yuppity\/\\\"",
+        "unicode": "\u0939\u0948",
+        "array": [
+            "yes",
+            30,
+            true, 
+            {
+                "test": false
+            },
+            [60, 40]
+        ]
     }
 }}    

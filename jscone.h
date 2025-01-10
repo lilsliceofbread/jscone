@@ -74,8 +74,8 @@ typedef struct JsconeNode
 JsconeNode* jscone_parse(const char* json, u32 length);
 
 /**
- * @brief    finds node at specified path e.g "world/player_data"
- * @note     use backslash \ to escape in names that contain forward slashes
+ * @brief    finds node at specified path from the root node e.g "world/player_data"
+ * @note     use backslash \ to escape forward slashes / if they are contained within names
  * @returns  pointer to node at path
  */
 JsconeNode* jscone_find(JsconeNode* node, const char* path);
@@ -154,9 +154,8 @@ void jscone_node_print(JsconeNode* node, u32 indent);
 
 static const char* jscone_get_type_name(JsconeType type);
 char* jscone_remove_string_quotes(const char* first_char, u32 length);
-u16 jscone_parse_escape_sequence(JsconeParser* parser, u32 offset);
-
-//static u16 powers_of_16[4] = {4096, 256, 16, 1};
+u8 jscone_parse_escape_sequence(JsconeParser* parser, u32 offset, char* bytes);
+u8 jscone_codepoint_to_utf8(char* bytes, u32 codepoint);
 
 /**
  * exposed functions
@@ -186,11 +185,41 @@ JsconeNode* jscone_parse(const char* json, u32 length)
 
 JsconeNode* jscone_find(JsconeNode* root, const char* path)
 {
-    // for loop until next / or \\
+    // WIP
+    // RECURSIVE? instead of triple for loop
     // search through next ptr for name
     // return NULL if none
     
-    JsconeNode* node;
+    JsconeNode* node = NULL;
+    JsconeToken curr = {.first = 0, .end = 0};
+
+    char c;
+    u8 escaped = JSCONE_FALSE;
+    for(u32 i = 0; (c = path[i]) != '\0'; i++)
+    {
+        if(c == '\\')        
+        {
+            if(escaped)
+            {
+                curr.end++;
+                escaped = JSCONE_FALSE;
+            }
+            escaped = JSCONE_TRUE;
+        }
+        else if(c == '/')
+        {
+            if(escaped)
+            {
+                curr.end++;
+                escaped = JSCONE_FALSE;
+            }
+            for(u32 j = 0; j < (curr.end - curr.first); j++)
+            {
+
+            }
+        }
+        curr.end++;
+    }
 
     return node;
 }
@@ -356,18 +385,18 @@ i32 jscone_parser_parse_string(JsconeParser* parser, const char* name)
 
         if(escaped)
         {
-            if(c == 'u')
+            char bytes[5];
+            u8 length = jscone_parse_escape_sequence(parser, i, bytes);
+
+            for(u8 j = 0; j < length; j++)
             {
-                JSCONE_ERROR("unicode escape sequence not supported yet\n");
-                i += 4;
-                string[str_i++] = '?';
-                escaped = JSCONE_FALSE;
-                continue;
+                string[str_i++] = bytes[j];
             }
 
-            u16 bytes = jscone_parse_escape_sequence(parser, i);
-
-            string[str_i++] = (char)bytes;
+            if(length > 1) // skip 4 unicode hex characters
+            {
+                i += 4;
+            }
             escaped = JSCONE_FALSE;
             continue;
         }
@@ -693,57 +722,98 @@ char* jscone_remove_string_quotes(const char* first_char, u32 length)
     return string;
 }
 
-u16 jscone_parse_escape_sequence(JsconeParser* parser, u32 offset)
+u8 jscone_parse_escape_sequence(JsconeParser* parser, u32 offset, char* bytes)
 {
-    u16 bytes = 0;
+    u32 codepoint; // could be u16 but anyway
 
     const char* cp = &parser->lexer.json[parser->lexer.curr.first + offset];
     switch(*cp)
     {
-        case '/':
-            bytes = (u16)*cp;
-            break;
-        case 'b':
-            bytes = '\b';
-            break;
-        case 'f':
-            bytes = '\f';
-            break;
-        case 'n':
-            bytes = '\n';
-            break;
-        case 'r':
-            bytes = '\r';
-            break;
-        case 't':
-            bytes = '\t';
-            break;
-        /*case 'u':
+        case 'u':
+            codepoint = 0;
+
             for(u32 i = 0; i < 4; i++)
             {
-                cp++;
-                char c = *cp;
+                char c = *(++cp);
+                codepoint = (codepoint << 4);
 
                 if('0' <= c && c <= '9')
                 {
-                    bytes += ((u16)c - (u16)'0') * powers_of_16[i];
+                    codepoint += (u32)(c - '0');
                 }
                 else if('a' <= c && c <= 'f')
                 {
-                    bytes += ((u16)c - (u16)'a' + 10) * powers_of_16[i];
+                    codepoint += (u32)(c - 'a' + 10);
                 }
                 else if('A' <= c && c <= 'F')
                 {
-                    bytes += ((u16)c - (u16)'A' + 10) * powers_of_16[i];
+                    codepoint += (u32)(c - 'A' + 10);
                 }
             }
-            break;*/
+            return jscone_codepoint_to_utf8(bytes, codepoint); // only case that size can be other than 1
+        case '/':
+            bytes[0] = '/';
+            break;
+        case 'b':
+            bytes[0] = '\b';
+            break;
+        case 'f':
+            bytes[0] = '\f';
+            break;
+        case 'n':
+            bytes[0] = '\n';
+            break;
+        case 'r':
+            bytes[0] = '\r';
+            break;
+        case 't':
+            bytes[0] = '\t';
+            break;
         default:
             JSCONE_ERROR("invalid escape sequence char %c\n", *cp);
-            return '?'; // best i can think of
+            bytes[0] = '?'; // best i can think of
+            break;
     }
 
-    return bytes;
+    return 1;
+}
+
+// thank you https://gist.github.com/MightyPork/52eda3e5677b4b03524e40c9f0ab1da5
+u8 jscone_codepoint_to_utf8(char* bytes, u32 codepoint)
+{
+    if(codepoint <= 0x7F)
+    {
+        // plain ascii
+        bytes[0] = (char)codepoint;
+        bytes[1] = 0;
+        return 1;
+    }
+    else if(codepoint <= 0x07FF) 
+    {
+        // 2-byte unicode
+        bytes[0] = (char)(((codepoint >> 6) & 0x1F) | 0xC0);
+        bytes[1] = (char)(((codepoint >> 0) & 0x3F) | 0x80);
+        bytes[2] = 0;
+        return 2;
+    }
+    else if(codepoint <= 0xFFFF)
+    {
+        // 3-byte unicode
+        bytes[0] = (char)(((codepoint >> 12) & 0x0F) | 0xE0);
+        bytes[1] = (char)(((codepoint >>  6) & 0x3F) | 0x80);
+        bytes[2] = (char)(((codepoint >>  0) & 0x3F) | 0x80);
+        bytes[3] = 0;
+        return 3;
+    }
+    else
+    { 
+        // error - use replacement character
+        bytes[0] = (char)0xEF;  
+        bytes[1] = (char)0xBF;
+        bytes[2] = (char)0xBD;
+        bytes[3] = 0;
+        return 0;
+    }
 }
 
 #endif
