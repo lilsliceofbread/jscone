@@ -1,16 +1,8 @@
 # jscone
 
-WORK IN PROGRESS
-
 TODO:
 
-- implement find function (paths)
-
-- use json tester to find errors
-
 - pool memory instead of many mallocs
-
-- functionise/simplify
 
 - optionally separate c file
 

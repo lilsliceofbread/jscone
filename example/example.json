@@ -29,6 +29,7 @@
         "false": false,
         "escaped": "\"\\/yuppity\/\\\"",
         "unicode": "\u0939\u0948",
+        "quotes": "&#34; \u0022 %22 0x22 034 &#x22;",
         "array": [
             "yes",
             30,
