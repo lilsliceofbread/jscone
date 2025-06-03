@@ -99,7 +99,6 @@ void jscone_print(JsconeNode* node);
  * internal types and functions
  */
 
-/* shouldn't cause leaked memory as the output can still be freed */
 #define JSCONE_PARSER_NEXT_TOKEN(parser) if(jscone_lexer_next_token(&((parser)->lexer)) == JSCONE_FAILURE) { return JSCONE_FAILURE; }
 #define JSCONE_PARSER_TOKEN_LENGTH(parser) ((parser)->lexer.curr.end - (parser)->lexer.curr.first)
 #define JSCONE_PARSER_GET_FIRST_CHAR(parser) ((parser)->lexer.json[(parser)->lexer.curr.first])
@@ -115,7 +114,7 @@ if(char != expected)                              \
 
 typedef struct
 {
-    u32 first; // first character in json string (index)
+    u32 first; // first character of token in json string (index)
     u32 end;   // 1 past last character
 } JsconeToken;
 
@@ -129,7 +128,7 @@ typedef struct
 typedef struct
 {
     JsconeLexer lexer;
-    JsconeNode* curr_node; // current parent i.e. only the current object/array
+    JsconeNode* curr_node;
 } JsconeParser;
 
 i32 jscone_parser_parse_value(JsconeParser* parser, const char* name);
@@ -246,7 +245,7 @@ JsconeNode* jscone_find(JsconeNode* node, const char* path)
 
     JsconeParser parser = {
         .lexer = {
-            .curr = {.first = (u32)0, .end = (u32)0}, // exceedingly stupid (but jscone_parser_parse_name assumes name starts at 1 since 0 has ")
+            .curr = {.first = (u32)0, .end = (u32)0},
             .json = path,
             .length = (u32)strlen(path),
         },
@@ -322,15 +321,15 @@ JsconeNode* jscone_find(JsconeNode* node, const char* path)
     return NULL; // should not reach this
 }
 
-void jscone_free(JsconeNode* parsed_json)
+void jscone_free(JsconeNode* node)
 {
-    if(parsed_json == NULL)
+    if(node == NULL)
     {
         return;
     }
     
     /* find top node */
-    JsconeNode* head = parsed_json;
+    JsconeNode* head = node;
     while(head->parent != NULL)
     {
         head = head->parent;
@@ -339,14 +338,14 @@ void jscone_free(JsconeNode* parsed_json)
     jscone_node_free(head);
 }
 
-void jscone_print(JsconeNode* parsed_json)
+void jscone_print(JsconeNode* node)
 {
-    if(parsed_json == NULL)
+    if(node == NULL)
     {
         return;
     }
 
-    jscone_node_print(parsed_json, 0);
+    jscone_node_print(node, 0);
 }
 
 
@@ -397,7 +396,7 @@ i32 jscone_parser_parse_value(JsconeParser* parser, const char* name)
             return jscone_parser_parse_enum(parser, name);
     }
 
-    return JSCONE_FAILURE; // how did we get here?
+    return JSCONE_FAILURE; // should not be reached
 }
 
 i32 jscone_parser_parse_object(JsconeParser* parser, const char* name)
@@ -778,6 +777,8 @@ i32 jscone_lexer_lex_string(JsconeLexer* lexer)
     }
 }
 
+
+
 /* nodes */
 
 JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal value)
@@ -792,7 +793,7 @@ JsconeNode* jscone_node_create(JsconeNode* parent, JsconeType type, JsconeVal va
     node->next = NULL;
     node->name = NULL;
 
-    // automatically insert child correctly
+    /* automatically insert child correctly */
     if(parent != NULL)
     {
         if(parent->child == NULL)
@@ -891,9 +892,6 @@ static const char* jscone_get_type_name(JsconeType type)
     return type_names[type];
 }
 
-/**
- * @returns length of byte array
- */
 u8 jscone_parse_escape_sequence(JsconeParser* parser, u32 offset, char* bytes)
 {
     const char* cp = &parser->lexer.json[parser->lexer.curr.first + offset];
@@ -963,14 +961,14 @@ u8 jscone_codepoint_to_utf8(char* bytes, const char* codepoint_str)
 
     if(codepoint <= 0x7F)
     {
-        // plain ascii
+        /* plain ascii */
         bytes[0] = (char)codepoint;
         bytes[1] = 0;
         return 1;
     }
     else if(codepoint <= 0x07FF) 
     {
-        // 2-byte unicode
+        /* 2-byte unicode */
         bytes[0] = (char)(((codepoint >> 6) & 0x1F) | 0xC0);
         bytes[1] = (char)(((codepoint >> 0) & 0x3F) | 0x80);
         bytes[2] = 0;
@@ -978,7 +976,7 @@ u8 jscone_codepoint_to_utf8(char* bytes, const char* codepoint_str)
     }
     else if(codepoint <= 0xFFFF)
     {
-        // 3-byte unicode
+        /* 3-byte unicode */
         bytes[0] = (char)(((codepoint >> 12) & 0x0F) | 0xE0);
         bytes[1] = (char)(((codepoint >>  6) & 0x3F) | 0x80);
         bytes[2] = (char)(((codepoint >>  0) & 0x3F) | 0x80);
@@ -987,7 +985,7 @@ u8 jscone_codepoint_to_utf8(char* bytes, const char* codepoint_str)
     }
     else
     { 
-        // error - use replacement character
+        /* error - use replacement character */
         bytes[0] = (char)0xEF;  
         bytes[1] = (char)0xBF;
         bytes[2] = (char)0xBD;
@@ -996,6 +994,6 @@ u8 jscone_codepoint_to_utf8(char* bytes, const char* codepoint_str)
     }
 }
 
-#endif
+#endif /* JSCONE_IMPLEMENTATION */
 
-#endif
+#endif /* JSCONE_H */

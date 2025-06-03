@@ -40,7 +40,7 @@ void test_print(u8 num, const char* msg)
             break;
     }
 
-    // set colour for prefix
+    /* set colour for prefix */
     #ifdef _WIN32
         CONSOLE_SCREEN_BUFFER_INFO cb_info;
         HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -77,6 +77,7 @@ void test_allocate_string(char** ptr, char* string)
 
 int main(void)
 {
+    printf("\n[NOTE]: passing tests may intentionally produce errors which get printed; ignore these as long as it says TEST PASSED\n");
     /* tests run automatically before and after main with insane preprocessor manipulation */
     return 0;
 }

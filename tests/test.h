@@ -25,6 +25,7 @@ typedef u8 (*TestFunc)(void);
 #define TEST(func_name) static u8 func_name(void)
 #define END_TESTS()
 #else
+
 /* begin region of test funcs */
 #define BEGIN_TESTS() static TestFunc test_funcs[MAX_TESTS]; static char* test_names[MAX_TESTS]; static int test_count = 0;
 
