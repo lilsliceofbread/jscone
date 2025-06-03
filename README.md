@@ -1,6 +1,6 @@
 # jscone
 
-my bad attempt a json parser in c
+my attempt at a json parser in c
 
 resources used: [json.org's JSON flowchart](https://www.json.org/), [VoxelRift's video about parsing mathematical expressions](https://youtu.be/myZcNjKcVGw)
 
