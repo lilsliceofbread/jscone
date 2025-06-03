@@ -5,11 +5,11 @@
 #include <stdio.h>
 #include <errno.h>
 
-char* dump_file_contents(const char* filename, u32* file_size_out)
+char* dump_file_contents(const char* filename, unsigned int* file_size_out)
 {
     char* text;
     FILE* file;
-    u32 file_size;
+    unsigned int file_size;
 
     file = fopen(filename, "rb");
 
@@ -19,7 +19,7 @@ char* dump_file_contents(const char* filename, u32* file_size_out)
     text = (char*)malloc(file_size + 1);
     
     fseek(file, 0, SEEK_SET);
-    fread(text, sizeof(char), (u32)file_size, file);
+    fread(text, sizeof(char), (unsigned int)file_size, file);
     text[file_size] = '\0';
 
     fclose(file);
@@ -31,7 +31,7 @@ char* dump_file_contents(const char* filename, u32* file_size_out)
 int main(void)
 {
     char* json = NULL;
-    u32 file_size;
+    unsigned int file_size;
     JsconeNode* result;
     
     /* from https://microsoftedge.github.io/Demos/json-dummy-data/ */

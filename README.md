@@ -6,11 +6,15 @@ resources used: [json.org's JSON flowchart](https://www.json.org/), [VoxelRift's
 
 - single header
 
+- creates an n-ary tree which can be searched through like a directory to find values
+
+- supports c99, only requires libc
+
 - only parsing, no writing (yet)
 
-- creates n-ary tree of values
-
 - can only handle unicode up to 0xFFFF
+
+- heap allocated
 
 include in your main file with:
 

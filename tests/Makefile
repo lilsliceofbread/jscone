@@ -1,6 +1,6 @@
 NAME := tests
 CC := gcc
-CC_FLAGS := -g -Wall -Wpedantic -Wextra -Wconversion -O2 # compiler flags
+CC_FLAGS := -g -Wall -Wpedantic -Wextra -Wconversion -O2 -std=c99 # c compiler flags
 CPP_FLAGS := -MMD -MP -I../ # preprocessor flags
 LD_FLAGS := #-lm
 

@@ -12,7 +12,7 @@ endif
 else
 	mkdir -p ../build
 endif
-	gcc -g -Wall -Wpedantic -I.. example.c -o ../build/example
+	gcc -g -Wall -Wpedantic -I.. -std=c99 example.c -o ../build/example
 
 
 run: build
