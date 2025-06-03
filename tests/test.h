@@ -16,8 +16,6 @@ typedef u8 (*TestFunc)(void);
 
 #define MAX_TESTS 32 
 
-/* note: can't believe i got this to work */
-
 #define TEST_ASSERT(cond) TEST_ASSERT_MSG(cond, #cond);
 #define TEST_ASSERT_MSG(cond, msg) if(!(cond)) {test_print(TEST_ASSERT_FAIL, msg); return TEST_FAILURE;}
 #define TEST_ASSERT_STREQUAL(str1, str2) if(strcmp(str1, str2) != 0) {test_print_var(TEST_ASSERT_FAIL, "%s != %s", str1, str2); return TEST_FAILURE;}

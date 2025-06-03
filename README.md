@@ -1,11 +1,5 @@
 # jscone
 
-TODO:
-
-- pool memory instead of many mallocs
-
-- optionally separate c file
-
 my bad attempt a json parser in c
 
 resources used: [json.org's JSON flowchart](https://www.json.org/), [VoxelRift's video about parsing mathematical expressions](https://youtu.be/myZcNjKcVGw)

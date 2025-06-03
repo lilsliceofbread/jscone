@@ -5,39 +5,6 @@
 #include <stdio.h>
 #include <errno.h>
 
-/*
-int main(void)
-{
-    char* json;
-    FILE* file;
-    u32 file_size;
-
-    file = fopen("example.json", "rb");
-
-    fseek(file, 0, SEEK_END);
-    file_size = ftell(file);
-
-    json = (char*)malloc(file_size + 1);
-    
-    fseek(file, 0, SEEK_SET);
-    fread(json, sizeof(char), (u32)file_size, file);
-    json[file_size] = '\0';
-
-    fclose(file);
-
-
-
-    JsconeNode* result = jscone_parse(json, file_size);
-
-    jscone_print(result);
-
-    jscone_free(result);
-    free(json);
-
-    return 0;
-}
-*/
-
 char* dump_file_contents(const char* filename, u32* file_size_out)
 {
     char* text;
@@ -63,42 +30,26 @@ char* dump_file_contents(const char* filename, u32* file_size_out)
 
 int main(void)
 {
-    char filename_buf[32] = {0};
     char* json = NULL;
     u32 file_size;
     JsconeNode* result;
     
-    printf("parsing incorrect json");
-    for(u32 i = 1; i <= 33; i++)
+    /* from https://microsoftedge.github.io/Demos/json-dummy-data/ */
+    json = dump_file_contents("5MB-min.json", &file_size);
+    result = jscone_parse(json, file_size);
+
+    JsconeNode* last_node = result->child;
+    int i = 1;
+    while(last_node->next != NULL)
     {
-        snprintf(filename_buf, 32, "suite/fail%u.json", i);
-        json = dump_file_contents(filename_buf, &file_size);
-        printf("\nparsing %s. json string:\n%s\n", filename_buf, json);
-
-        result = jscone_parse(json, file_size);
-        jscone_print(result);
-        jscone_free(result);
-        if(json != NULL)
-        {
-            free(json);
-        }
+        last_node = last_node->next;
+        i++;
     }
+    printf("Person number %d:\n", i);
+    jscone_print(last_node->child);
+    jscone_free(result);
 
-    printf("\nparsing correct json");
-    for(u32 i = 1; i <= 3; i++)
-    {
-        snprintf(filename_buf, 32, "suite/pass%u.json", i);
-        json = dump_file_contents(filename_buf, &file_size);
-        printf("\nparsing %s:\n", filename_buf);
-
-        result = jscone_parse(json, file_size);
-        jscone_print(result);
-        jscone_free(result);
-        if(json != NULL)
-        {
-            free(json);
-        }
-    }
+    free(json);
 
     return 0;
 }

@@ -13,7 +13,7 @@ TEST(find_simple)
     JsconeNode* result = jscone_parse(json, (u32)strlen(json));
     TEST_ASSERT(result != NULL);
 
-    JsconeNode* found_node = jscone_find(result, "name1/name2/name3");
+    JsconeNode* found_node = jscone_find(result, "/name1/name2/name3");
     TEST_ASSERT(found_node != NULL);
     TEST_ASSERT(found_node->name != NULL);
     TEST_ASSERT_STREQUAL(found_node->name, "name3");
@@ -42,12 +42,26 @@ TEST(find_complex)
     JsconeNode* result = jscone_parse(json, (u32)strlen(json));
     TEST_ASSERT(result != NULL);
 
-    JsconeNode* found_node = jscone_find(result, "name1\\//\\u0022name2/name3");
+    JsconeNode* found_node = jscone_find(result, "/name1\\//\\u0022name2/name3");
     TEST_ASSERT(found_node != NULL);
     TEST_ASSERT(found_node->name != NULL);
     TEST_ASSERT_STREQUAL(found_node->name, "name3");
     TEST_ASSERT(found_node->type == JSCONE_BOOL);
     TEST_ASSERT(found_node->value.bool == JSCONE_TRUE);
+
+    result = result->child;
+    found_node = jscone_find(result, "name1\\/"); // test search starting from current node
+    TEST_ASSERT(found_node != NULL);
+    TEST_ASSERT(found_node->name != NULL);
+    TEST_ASSERT_STREQUAL(found_node->name, "name1/");
+    TEST_ASSERT(found_node->type == JSCONE_OBJECT);
+
+    found_node = jscone_find(result, "name1"); 
+    TEST_ASSERT(found_node != NULL);
+    TEST_ASSERT(found_node->name != NULL);
+    TEST_ASSERT_STREQUAL(found_node->name, "name1");
+    TEST_ASSERT(found_node->type == JSCONE_BOOL);
+    TEST_ASSERT(found_node->value.bool == JSCONE_FALSE);
 
     jscone_free(result);
 
