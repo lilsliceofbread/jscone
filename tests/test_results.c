@@ -4,6 +4,8 @@
 #define JSCONE_IMPLEMENTATION
 #include "jscone.h"
 
+#include "test_utils.h"
+
 BEGIN_TESTS()
 
 TEST(find_simple)

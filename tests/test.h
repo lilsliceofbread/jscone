@@ -2,7 +2,8 @@
 #define TEST_H
 
 /**
- ** my test system that automatically runs tests using macros (edit: doesn't work on MSVC :/)
+ ** my test system that automatically runs tests using functions which run before/after main
+ ** (should) work on gcc and clang, doesn't work on msvc (yet?)
  */
 
 #include <string.h>
@@ -12,36 +13,28 @@
 #define TEST_FAILURE 0
 
 typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-typedef unsigned long long u64;
-
-typedef signed char i8;
-typedef short i16;
-typedef int i32;
-typedef long long i64;
-
-typedef float f32;
-typedef double f64;
-
 typedef u8 (*TestFunc)(void);
 
 #define MAX_TESTS 32 
 
-#define TEST_ASSERT(cond) TEST_ASSERT_MSG(cond, #cond);
-#define TEST_ASSERT_MSG(cond, msg) if(!(cond)) {test_print(TEST_ASSERT_FAIL, msg); return TEST_FAILURE;}
-#define TEST_ASSERT_STREQUAL(str1, str2) if(strcmp(str1, str2) != 0) {test_print_var(TEST_ASSERT_FAIL, "%s != %s", str1, str2); return TEST_FAILURE;}
+/* prevent functions from generating confusing output in tests */
+#define TEST_PRINT(type, msg) test_resume_output(stdout_fd, stderr_fd); test_print(type, msg); test_suppress_output(&stdout_fd, &stderr_fd)
+#define TEST_PRINT_VAR(type, ...) test_resume_output(stdout_fd, stderr_fd); test_print_var(type, __VA_ARGS__); test_suppress_output(&stdout_fd, &stderr_fd)
 
-#ifdef _MSC_VER
+#define TEST_ASSERT(cond) TEST_ASSERT_MSG(cond, #cond);
+#define TEST_ASSERT_MSG(cond, msg) if(!(cond)) {TEST_PRINT(TEST_ASSERT_FAIL, msg); return TEST_FAILURE;}
+#define TEST_ASSERT_STREQUAL(str1, str2) if(strcmp(str1, str2) != 0) {TEST_PRINT_VAR(TEST_ASSERT_FAIL, "%s != %s", str1, str2); return TEST_FAILURE;}
+
+#if defined(_MSC_VER)
 #define BEGIN_TESTS()
 #define TEST(func_name) static u8 func_name(void)
 #define END_TESTS()
 #else
 
 /* begin region of test funcs */
-#define BEGIN_TESTS() static TestFunc test_funcs[MAX_TESTS]; static char* test_names[MAX_TESTS]; static int test_count = 0;
+#define BEGIN_TESTS() static TestFunc test_funcs[MAX_TESTS]; static char* test_names[MAX_TESTS]; static int test_count = 0; static int stdout_fd = 0; static int stderr_fd = 0;
 
-/* define test function */
+/* define test function and add to list */
 #define TEST(func_name) static u8 test_##func_name(void); \
 static void __attribute__((constructor)) add_test_##func_name(void)         \
 {                                                                           \
@@ -56,25 +49,24 @@ static void __attribute__((constructor)) add_test_##func_name(void)         \
 }                                                                           \
 static u8 test_##func_name(void)                                 
 
-/* end region of test funcs */
-/* could move this into a do_tests_impl to do more stuff like sum total failed/succeeded */
+/* run test funcs and print results */
 #define END_TESTS() static void __attribute__((destructor)) do_tests(void) \
 {                                          \
     TestFunc func = NULL;                  \
+    u8 ret = TEST_FAILURE;                 \
     printf("\n");                          \
     test_print(TEST_LOG, __FILE__);        \
     for(int i = 0; i < test_count; i++)    \
     {                                      \
         func = test_funcs[i];              \
-        test_print(func(), test_names[i]); \
+        test_suppress_output(&stdout_fd, &stderr_fd); \
+        ret = func(); \
+        test_resume_output(stdout_fd, stderr_fd); \
+        test_print(ret, test_names[i]); \
         free(test_names[i]);               \
     }                                      \
 }
 #endif
-
-/**
- * internal stuff
- */
 
 #define TEST_ASSERT_FAIL 3
 #define TEST_LOG 2
@@ -84,5 +76,9 @@ void test_print(u8 num, const char* msg);
 void test_print_var(u8 num, const char* msg, ...);
 
 void test_allocate_string(char** ptr, char* string);
+
+void test_suppress_output(int* stdout_fd, int* stderr_fd);
+
+void test_resume_output(int stdout_fd, int stderr_fd);
 
 #endif

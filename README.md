@@ -10,11 +10,15 @@ resources used: [json.org's JSON flowchart](https://www.json.org/), [VoxelRift's
 
 - supports c99, only requires libc
 
+- prints json error line numbers (roughly)
+
 - only parsing, no writing (yet)
 
 - can only handle unicode up to 0xFFFF
 
-- heap allocated
+- default uses malloc - can replace macro with your allocation function
+
+## using it
 
 include in your main file with:
 
@@ -31,3 +35,14 @@ run example with:
 cd example
 make run
 ```
+
+## testing
+
+run tests with:
+
+```
+cd tests
+make run
+```
+
+tests are created and run automatically using cursed macros (doesn't work on msvc)

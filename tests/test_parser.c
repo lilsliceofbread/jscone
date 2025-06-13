@@ -13,6 +13,7 @@ TEST(parse_string)
             .json = test_string,
             .length = (u32)strlen(test_string),
             .curr = {.first = 0, .end = 0},
+            .line_num = 1,
         },
         .curr_node = node,
     };
@@ -43,6 +44,7 @@ TEST(parse_number)
             .json = test_string,
             .length = (u32)strlen(test_string),
             .curr = {.first = 0, .end = 0},
+            .line_num = 1,
         },
         .curr_node = node,
     };
@@ -76,6 +78,7 @@ TEST(parse_enum)
             .json = test_string,
             .length = (u32)strlen(test_string),
             .curr = {.first = 0, .end = 0},
+            .line_num = 1,
         },
         .curr_node = node,
     };
@@ -115,6 +118,7 @@ TEST(parse_empty_array)
             .json = test_string,
             .length = (u32)strlen(test_string),
             .curr = {.first = 0, .end = 0},
+            .line_num = 1,
         },
         .curr_node = node,
     };
@@ -146,6 +150,7 @@ TEST(parse_one_item_array)
             .json = test_string,
             .length = (u32)strlen(test_string),
             .curr = {.first = 0, .end = 0},
+            .line_num = 1,
         },
         .curr_node = node,
     };
@@ -186,6 +191,7 @@ TEST(parse_complex_array)
             .json = test_string,
             .length = (u32)strlen(test_string),
             .curr = {.first = 0, .end = 0},
+            .line_num = 1,
         },
         .curr_node = node,
     };
@@ -240,6 +246,7 @@ TEST(parse_empty_object)
             .json = test_string,
             .length = (u32)strlen(test_string),
             .curr = {.first = 0, .end = 0},
+            .line_num = 1,
         },
         .curr_node = node,
     };
@@ -271,6 +278,7 @@ TEST(parse_one_item_object)
             .json = test_string,
             .length = (u32)strlen(test_string),
             .curr = {.first = 0, .end = 0},
+            .line_num = 1,
         },
         .curr_node = node,
     };
@@ -309,6 +317,7 @@ TEST(parse_complex_object)
             .json = test_string,
             .length = (u32)strlen(test_string),
             .curr = {.first = 0, .end = 0},
+            .line_num = 1,
         },
         .curr_node = node,
     };

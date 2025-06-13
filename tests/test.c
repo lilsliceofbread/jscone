@@ -10,9 +10,13 @@
     #define FAILED_COLOUR FOREGROUND_RED 
     #define LOG_COLOUR FOREGROUND_RED | FOREGROUND_BLUE
 #else
+#ifdef __linux__
+    #include <unistd.h>
+    #include <fcntl.h>
     #define PASSED_COLOUR 92
     #define FAILED_COLOUR 91
     #define LOG_COLOUR 95
+#endif
 #endif
 
 void test_print(u8 num, const char* msg)
@@ -71,13 +75,42 @@ void test_print_var(u8 num, const char* msg, ...)
 
 void test_allocate_string(char** ptr, char* string)
 {
-    *ptr = malloc((strlen(string) + 1) * sizeof(char));
-    strcpy(*ptr, string);
+    unsigned int length = (unsigned int)strlen(string);
+    *ptr = malloc((length + 1) * sizeof(char));
+    strncpy(*ptr, string, length + 1);
+}
+
+/* NOTE: stdout = 1, stderr = 2 */
+
+void test_suppress_output(int* stdout_fd, int* stderr_fd)
+{
+    fflush(stdout);
+    fflush(stderr);
+
+    *stdout_fd = dup(1); 
+    *stderr_fd = dup(2);
+
+    int null_fd = open("/dev/null", O_WRONLY); 
+    dup2(null_fd, 1);
+    dup2(null_fd, 2);
+
+    close(null_fd);
+}
+
+void test_resume_output(int stdout_fd, int stderr_fd)
+{
+    fflush(stdout);
+    fflush(stderr);
+
+    dup2(stdout_fd, 1);
+    dup2(stderr_fd, 2);
+
+    close(stdout_fd);
+    close(stderr_fd);
 }
 
 int main(void)
 {
-    printf("\n[NOTE]: passing tests may intentionally produce errors which get printed; ignore these as long as it says TEST PASSED\n");
     /* tests run automatically before and after main with insane preprocessor manipulation */
     return 0;
 }
