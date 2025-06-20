@@ -4,6 +4,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include <unistd.h>
+#include <fcntl.h>
+
 #ifdef _WIN32
     #include <windows.h>
     #define PASSED_COLOUR FOREGROUND_GREEN
@@ -11,8 +14,6 @@
     #define LOG_COLOUR FOREGROUND_RED | FOREGROUND_BLUE
 #else
 #ifdef __linux__
-    #include <unistd.h>
-    #include <fcntl.h>
     #define PASSED_COLOUR 92
     #define FAILED_COLOUR 91
     #define LOG_COLOUR 95
@@ -84,15 +85,24 @@ void test_allocate_string(char** ptr, char* string)
 
 void test_suppress_output(int* stdout_fd, int* stderr_fd)
 {
+    int stdout_no = fileno(stdout); 
+    int stderr_no = fileno(stderr); 
+    int null_fd;
+
     fflush(stdout);
     fflush(stderr);
 
-    *stdout_fd = dup(1); 
-    *stderr_fd = dup(2);
+    *stdout_fd = dup(stdout_no); 
+    *stderr_fd = dup(stderr_no);
+    
+#ifdef _WIN32
+    null_fd = open("nul", O_WRONLY); 
+#else
+    null_fd = open("/dev/null", O_WRONLY); 
+#endif
 
-    int null_fd = open("/dev/null", O_WRONLY); 
-    dup2(null_fd, 1);
-    dup2(null_fd, 2);
+    dup2(null_fd, stdout_no); 
+    dup2(null_fd, stderr_no);
 
     close(null_fd);
 }
@@ -102,8 +112,8 @@ void test_resume_output(int stdout_fd, int stderr_fd)
     fflush(stdout);
     fflush(stderr);
 
-    dup2(stdout_fd, 1);
-    dup2(stderr_fd, 2);
+    dup2(stdout_fd, fileno(stdout));
+    dup2(stderr_fd, fileno(stderr));
 
     close(stdout_fd);
     close(stderr_fd);
